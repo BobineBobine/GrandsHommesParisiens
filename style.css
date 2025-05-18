@@ -8,3 +8,89 @@ body {
     width: 100%;
 }
 
+#filters-panel {
+    flex: 0 0 220px;
+    min-width: 200px;
+    max-width: 260px;
+    background: #fff;
+    border-radius: 12px;
+    box-shadow: 0 2px 12px rgba(44,62,80,0.07);
+    padding: 1.5rem 1rem 1rem 1rem;
+    margin-top: 0.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1.2rem;
+    font-size: 1rem;
+}
+#filters-panel h3 {
+    margin: 0 0 0.7em 0;
+    font-size: 1.15rem;
+    color: #2c3e50;
+    letter-spacing: 0.5px;
+}
+#filters {
+    display: flex;
+    flex-direction: column;
+    gap: 1.2rem;
+}
+#filters label {
+    min-width: unset;
+    font-weight: 500;
+    color: #34495e;
+}
+#filters select, #filters input[type="range"] {
+    margin-top: 0.3em;
+    width: 100%;
+}
+#siecle-range-value {
+    font-weight: bold;
+    color: #2c3e50;
+    margin-left: 0.5em;
+}
+.leaflet-popup-content {
+    font-family: 'Segoe UI', Arial, sans-serif;
+    font-size: 1.05em;
+    color: #222;
+    line-height: 1.5;
+}
+.popup-title {
+    font-weight: bold;
+    font-size: 1.15em;
+    color: #2c3e50;
+    margin-bottom: 0.2em;
+}
+.popup-adresse {
+    color: #666;
+    font-size: 0.98em;
+    margin-bottom: 0.5em;
+}
+.popup-retranscription {
+    margin-top: 0.5em;
+    font-size: 0.97em;
+    color: #222;
+}
+.popup-tags {
+    margin-top: 0.7em;
+    font-size: 0.93em;
+    color: #888;
+}
+#siecle-slider {
+    margin-top: 0.7em;
+    margin-bottom: 0.2em;
+}
+.noUi-target {
+    background: #f3f3f3;
+    border-radius: 6px;
+    border: 1px solid #bbb;
+    box-shadow: 0 1px 4px rgba(44,62,80,0.06);
+}
+.noUi-connect {
+    background: #2c3e50;
+}
+.noUi-handle {
+    background: #fff;
+    border: 1px solid #2c3e50;
+    box-shadow: 0 2px 6px rgba(44,62,80,0.09);
+}
+#map-fullscreen-btn, #map-locate-btn {
+}

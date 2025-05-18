@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Plaques Commémoratives de Paris</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
+    <link rel="stylesheet" href="style.css" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/nouislider@15.7.1/dist/nouislider.min.css" />
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Arial, sans-serif;
+            background: #f7f7f7;
+            color: #222;
+        }
+        header {
+            background: #2c3e50;
+            color: #fff;
+            padding: 2rem 1rem 1rem 1rem;
+            text-align: center;
+            box-shadow: 0 2px 8px rgba(44,62,80,0.08);
+        }
+        header h1 {
+            margin: 0 0 0.5rem 0;
+            font-size: 2.5rem;
+            letter-spacing: 1px;
+        }
+        header p {
+            margin: 0;
+            font-size: 1.2rem;
+            color: #e0e0e0;
+        }
+        main {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            align-items: flex-start;
+            max-width: 1200px;
+            margin: 2rem auto;
+            gap: 2rem;
+            padding: 0 1rem;
+        }
+        .description {
+            flex: 1 1 320px;
+            background: #fff;
+            border-radius: 12px;
+            box-shadow: 0 2px 12px rgba(44,62,80,0.07);
+            padding: 2rem;
+            min-width: 280px;
+            max-width: 500px;
+        }
+        .description h2 {
+            margin-top: 0;
+            color: #2c3e50;
+        }
+        .description ul {
+            margin: 1rem 0 0 1.2rem;
+        }
+        #filters-panel {
+            flex: 0 0 220px;
+            min-width: 200px;
+            max-width: 260px;
+            background: #fff;
+            border-radius: 12px;
+            box-shadow: 0 2px 12px rgba(44,62,80,0.07);
+            padding: 1.5rem 1rem 1rem 1rem;
+            margin-top: 0.5rem;
+            display: flex;
+            flex-direction: column;
+            gap: 1.2rem;
+            font-size: 1rem;
+        }
+        #filters-panel h3 {
+            margin: 0 0 0.7em 0;
+            font-size: 1.15rem;
+            color: #2c3e50;
+            letter-spacing: 0.5px;
+        }
+        #filters {
+            display: flex;
+            flex-direction: column;
+            gap: 1.2rem;
+        }
+        #filters label {
+            min-width: unset;
+            font-weight: 500;
+            color: #34495e;
+        }
+        #filters select, #filters input[type="range"] {
+            margin-top: 0.3em;
+            width: 100%;
+        }
+        #siecle-range-value {
+            font-weight: bold;
+            color: #2c3e50;
+            margin-left: 0.5em;
+        }
+        #map-container {
+            flex: 1 1 350px;
+            min-width: 320px;
+            max-width: 500px;
+            display: flex;
+            flex-direction: column;
+            align-items: stretch;
+            position: relative;
+        }
+        #map {
+            height: 400px;
+            width: 100%;
+            border-radius: 12px;
+            box-shadow: 0 2px 12px rgba(44,62,80,0.07);
+            border: 1px solid #e0e0e0;
+        }
+        .leaflet-popup-content {
+            font-family: 'Segoe UI', Arial, sans-serif;
+            font-size: 1.05em;
+            color: #222;
+            line-height: 1.5;
+        }
+        .popup-title {
+            font-weight: bold;
+            font-size: 1.15em;
+            color: #2c3e50;
+            margin-bottom: 0.2em;
+        }
+        .popup-adresse {
+            color: #666;
+            font-size: 0.98em;
+            margin-bottom: 0.5em;
+        }
+        .popup-retranscription {
+            margin-top: 0.5em;
+            font-size: 0.97em;
+            color: #222;
+        }
+        .popup-tags {
+            margin-top: 0.7em;
+            font-size: 0.93em;
+            color: #888;
+        }
+        #siecle-slider {
+            margin-top: 0.7em;
+            margin-bottom: 0.2em;
+        }
+        #map-action-btns {
+            position: fixed;
+            top: 22px;
+            right: 28px;
+            z-index: 3001;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        #map-fullscreen-btn, #map-locate-btn {
+            background: #fff;
+            border: none;
+            border-radius: 50%;
+            box-shadow: 0 2px 8px rgba(44,62,80,0.12);
+            width: 38px;
+            height: 38px;
+            padding: 0;
+            font-size: 1.25em;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background 0.2s;
+        }
+        #map-fullscreen-btn:hover, #map-locate-btn:hover {
+            background: #f0f0f0;
+        }
+        #map.fullscreen {
+            position: fixed !important;
+            top: 0; left: 0; right: 0; bottom: 0;
+            width: 100vw !important;
+            height: 100vh !important;
+            z-index: 2000;
+            border-radius: 0 !important;
+            box-shadow: none !important;
+        }
+        body.fullscreen-active {
+            overflow: hidden;
+        }
+        @media (max-width: 1100px) {
+            main {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            #filters-panel {
+                max-width: 100%;
+                margin-bottom: 1.5rem;
+                flex-direction: row;
+                flex-wrap: wrap;
+                gap: 1.5rem;
+            }
+        }
+        @media (max-width: 900px) {
+            #map {
+                height: 300px;
+            }
+        }
+        @media (max-width: 600px) {
+            #map-action-btns {
+                top: 10px;
+                right: 10px;
+            }
+            #map-fullscreen-btn, #map-locate-btn {
+                width: 32px;
+                height: 32px;
+                font-size: 1em;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>Plaques Commémoratives de Paris</h1>
+        <p>Découvrez les plaques qui racontent l'histoire des grands hommes et femmes ayant marqué la capitale.</p>
+    </header>
+    <main>
+        <section class="description">
+            <h2>À propos du projet</h2>
+            <p>
+                Ce site interactif vous propose une carte des plaques commémoratives de Paris, rendant hommage aux personnalités qui ont façonné la ville et l'histoire de France.
+            </p>
+            <ul>
+                <li>Visualisez l'emplacement des plaques sur la carte.</li>
+                <li>Découvrez des anecdotes et biographies en cliquant sur les marqueurs.</li>
+                <li>Explorez Paris autrement, à travers ses rues et ses souvenirs.</li>
+            </ul>
+            <p style="margin-top:1.5rem;">
+                <strong>Bonne exploration&nbsp;!</strong>
+            </p>
+        </section>
+        <aside id="filters-panel">
+            <h3>Filtres</h3>
+            <div id="filters"></div>
+        </aside>
+        <div id="map-container" style="position:relative;">
+            <div id="map"></div>
+        </div>
+        <div id="map-action-btns">
+            <button id="map-fullscreen-btn" title="Afficher la carte en plein écran">🗖</button>
+            <button id="map-locate-btn" title="Me localiser">📍</button>
+        </div>
+    </main>
+    <footer>
+        &copy; 2024 – Projet personnel | Données publiques | Design par un passionné de Paris
+    </footer>
+    <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/nouislider@15.7.1/dist/nouislider.min.js"></script>
+    <script src="script.js"></script>
+</body>
+</html>
