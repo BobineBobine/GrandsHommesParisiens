@@ -7,7 +7,7 @@ L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
 }).addTo(map);
 
 // Charger les données GeoJSON et les afficher sur la carte
-fetch('data.geojson')
+fetch('plaques_commemoratives.geojson')
     .then(response => response.json())
     .then(data => {
         L.geoJSON(data, {
