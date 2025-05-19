@@ -54,13 +54,13 @@ function createFilters(data) {
     const filtersDiv = document.getElementById('filters');
     filtersDiv.innerHTML = '';
 
-    // Filtre par type de personnes (renommé)
+    // Filtre par type de plaques (renommé)
     const typeDiv = document.createElement('div');
     typeDiv.style = 'display:flex;flex-direction:column;';
     typeDiv.innerHTML = `
-        <label style="margin-bottom:0.2em;">Sélection</label>
+        <label style="margin-bottom:0.2em;">Affichage</label>
         <select id="filter-type">
-            <option value="all">Toutes les personnes</option>
+            <option value="all">Toutes les plaques</option>
             <option value="personnes">Uniquement les personnes (sans bâtiments ni évènements)</option>
             <option value="wikipedia">Uniquement celles qui ont une page Wikipédia</option>
             <option value="top100">Uniquement le top 100 (nombre de visites Wikipédia)</option>
@@ -68,21 +68,20 @@ function createFilters(data) {
     `;
     filtersDiv.appendChild(typeDiv);
 
-    // Curseur d'années (double-bouton) + saisie manuelle
+    // Années min/max uniquement (plus de curseur)
     const [minAnnee, maxAnnee] = getMinMaxAnnee(data);
+    // Par défaut : 1945 à aujourd'hui
+    const defaultMin = 1945;
+    const defaultMax = maxAnnee;
     const anneeLabel = document.createElement('label');
     anneeLabel.style = 'display:flex;align-items:center;gap:0.7em;margin-bottom:0.5em;flex-wrap:wrap;';
     anneeLabel.innerHTML = `
         <span>Période :</span>
-        <input type="number" id="input-annee-min" min="0" max="${maxAnnee}" value="${minAnnee}" style="width:4.5em;">
+        <input type="number" id="input-annee-min" min="0" max="${maxAnnee}" value="${defaultMin}" style="width:4.5em;">
         <span>à</span>
-        <input type="number" id="input-annee-max" min="0" max="${maxAnnee}" value="${maxAnnee}" style="width:4.5em;">
+        <input type="number" id="input-annee-max" min="0" max="${maxAnnee}" value="${defaultMax}" style="width:4.5em;">
     `;
     filtersDiv.appendChild(anneeLabel);
-
-    const anneeSliderDiv = document.createElement('div');
-    anneeSliderDiv.id = 'annee-slider';
-    filtersDiv.appendChild(anneeSliderDiv);
 
     // Ajout du select de siècles (caché par défaut)
     const siecles = Array.from(new Set(
@@ -103,44 +102,33 @@ function createFilters(data) {
     `;
     filtersDiv.appendChild(siecleSelectDiv);
 
-    window.anneeSlider = noUiSlider.create(anneeSliderDiv, {
-        start: [minAnnee, maxAnnee],
-        connect: true,
-        step: 1,
-        range: { min: minAnnee, max: maxAnnee },
-        tooltips: [true, true],
-        format: {
-            to: v => Math.round(v),
-            from: v => Math.round(v)
-        }
-    });
-
-    // Synchronisation curseur <-> input
-    anneeSliderDiv.noUiSlider.on('update', function (values) {
-        document.getElementById('input-annee-min').value = values[0];
-        document.getElementById('input-annee-max').value = values[1];
-        // Afficher le select de siècles si la borne inférieure < 1700
-        if (Number(values[0]) < 1700) {
+    // Synchronisation inputs années <-> select siècle
+    function updateSiecleSelectDisplay() {
+        const min = parseInt(document.getElementById('input-annee-min').value) || 0;
+        if (min < 1700) {
             siecleSelectDiv.style.display = '';
         } else {
             siecleSelectDiv.style.display = 'none';
             document.getElementById('select-siecle').value = '';
         }
-        updatePlaquesLayer();
-    });
+    }
     document.getElementById('input-annee-min').addEventListener('change', function () {
         let min = parseInt(this.value) || 0;
         let max = parseInt(document.getElementById('input-annee-max').value) || maxAnnee;
         if (min > max) min = max;
-        window.anneeSlider.set([min, null]);
+        this.value = min;
+        updateSiecleSelectDisplay();
+        updatePlaquesLayer();
     });
     document.getElementById('input-annee-max').addEventListener('change', function () {
         let min = parseInt(document.getElementById('input-annee-min').value) || 0;
         let max = parseInt(this.value) || maxAnnee;
         if (max < min) max = min;
-        window.anneeSlider.set([null, max]);
+        this.value = max;
+        updatePlaquesLayer();
     });
     document.getElementById('select-siecle').addEventListener('change', updatePlaquesLayer);
+    updateSiecleSelectDisplay();
 
     // Filtre par arrondissement
     const arrondissements = getUniqueValues(data, 'ardt');
@@ -184,12 +172,8 @@ function labelWithSelect(labelText, selectEl) {
 // Fonction pour filtrer et afficher les plaques
 function updatePlaquesLayer() {
     if (!plaquesData) return;
-    let anneeMin = null, anneeMax = null;
-    if (window.anneeSlider) {
-        const values = window.anneeSlider.get();
-        anneeMin = Number(values[0]);
-        anneeMax = Number(values[1]);
-    }
+    let anneeMin = parseInt(document.getElementById('input-annee-min')?.value) || 0;
+    let anneeMax = parseInt(document.getElementById('input-annee-max')?.value) || new Date().getFullYear();
     const ardt = document.getElementById('filter-ardt')?.value;
     const objet = document.getElementById('filter-objet')?.value;
     const periode = document.getElementById('filter-periode')?.value;
@@ -202,7 +186,7 @@ function updatePlaquesLayer() {
         features: plaquesData.features.filter(f => {
             const p = f.properties;
 
-            // Filtre type de personnes (renommé)
+            // Filtre type de plaques
             if (type === "personnes" && (!p.personnalite || p.personnalite === "")) return false;
             if (type === "wikipedia" && (!(p.personnalite && p.score_popularite && p.score_popularite > 1))) return false;
             if (type === "top100" && (!(p.personnalite && top100.includes(p.score_popularite)))) return false;
