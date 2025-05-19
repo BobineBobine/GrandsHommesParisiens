@@ -22,36 +22,72 @@ function getUniqueValues(data, property) {
     });
 }
 
+// Fonction utilitaire pour obtenir min/max année sur toutes les entrées connues
+function getMinMaxAnnee(data) {
+    let min = Infinity, max = -Infinity;
+    data.features.forEach(f => {
+        const p = f.properties;
+        let debut = parseInt(p.annee_debut);
+        let fin = parseInt(p.annee_fin);
+        if (!isNaN(debut)) min = Math.min(min, debut);
+        if (!isNaN(fin)) max = Math.max(max, fin);
+    });
+    // fallback si aucune année trouvée
+    if (!isFinite(min)) min = 1700;
+    if (!isFinite(max)) max = new Date().getFullYear();
+    return [min, max];
+}
+
+// Fonction pour obtenir le top 100 des scores de popularité
+function getTop100Popularite(data) {
+    const scores = data.features
+        .map(f => f.properties.score_popularite || 0)
+        .filter(s => typeof s === "number" && !isNaN(s));
+    scores.sort((a, b) => b - a);
+    return scores.slice(0, 100);
+}
+
 // Fonction pour créer les filtres dans le DOM
 function createFilters(data) {
     const filtersDiv = document.getElementById('filters');
     filtersDiv.innerHTML = '';
 
-    // Filtre par siècle (curseur double-bout)
-    const siecles = getUniqueValues(data, 'siecle').filter(s => !isNaN(Number(s)));
-    const minSiecle = Math.min(...siecles.map(Number));
-    const maxSiecle = Math.max(...siecles.map(Number));
-    const siecleLabel = document.createElement('label');
-    siecleLabel.innerHTML = `Siècle&nbsp;<span id="siecle-range-value">${minSiecle}e - ${maxSiecle}e</span>`;
-    const siecleSliderDiv = document.createElement('div');
-    siecleSliderDiv.id = 'siecle-slider';
-    siecleLabel.appendChild(siecleSliderDiv);
-    filtersDiv.appendChild(siecleLabel);
+    // Filtre par type de personnes
+    const typeDiv = document.createElement('div');
+    typeDiv.style = 'display:flex;flex-direction:column;';
+    typeDiv.innerHTML = `
+        <label style="margin-bottom:0.2em;">Type</label>
+        <select id="filter-type">
+            <option value="all">Tout le monde</option>
+            <option value="personnes">Personnes (champ "personnalite" non vide)</option>
+            <option value="celebres">Personnes célèbres (score_popularite > 1)</option>
+            <option value="celebrissimes">Célébrissimes (top 100 popularité)</option>
+        </select>
+    `;
+    filtersDiv.appendChild(typeDiv);
 
-    // noUiSlider double-boutons
-    window.siecleSlider = noUiSlider.create(siecleSliderDiv, {
-        start: [minSiecle, maxSiecle],
+    // Curseur d'années (double-bouton)
+    const [minAnnee, maxAnnee] = getMinMaxAnnee(data);
+    const anneeLabel = document.createElement('label');
+    anneeLabel.innerHTML = `Années&nbsp;<span id="annee-range-value">${minAnnee} - ${maxAnnee}</span>`;
+    const anneeSliderDiv = document.createElement('div');
+    anneeSliderDiv.id = 'annee-slider';
+    anneeLabel.appendChild(anneeSliderDiv);
+    filtersDiv.appendChild(anneeLabel);
+
+    window.anneeSlider = noUiSlider.create(anneeSliderDiv, {
+        start: [minAnnee, maxAnnee],
         connect: true,
         step: 1,
-        range: { min: minSiecle, max: maxSiecle },
+        range: { min: minAnnee, max: maxAnnee },
         tooltips: [true, true],
         format: {
             to: v => Math.round(v),
             from: v => Math.round(v)
         }
     });
-    siecleSliderDiv.noUiSlider.on('update', function (values) {
-        document.getElementById('siecle-range-value').textContent = `${values[0]}e - ${values[1]}e`;
+    anneeSliderDiv.noUiSlider.on('update', function (values) {
+        document.getElementById('annee-range-value').textContent = `${values[0]} - ${values[1]}`;
         updatePlaquesLayer();
     });
 
@@ -80,7 +116,7 @@ function createFilters(data) {
     filtersDiv.appendChild(labelWithSelect('Période', periodeSelect));
 
     // Ajout des écouteurs d'événements
-    [ardtSelect, objetSelect, periodeSelect].forEach(sel => {
+    [document.getElementById('filter-type'), ardtSelect, objetSelect, periodeSelect].forEach(sel => {
         sel.addEventListener('change', updatePlaquesLayer);
     });
 }
@@ -98,25 +134,69 @@ function labelWithSelect(labelText, selectEl) {
 function updatePlaquesLayer() {
     if (!plaquesData) return;
     // Récupérer les valeurs des filtres
-    let siecleMin = null, siecleMax = null;
-    if (window.siecleSlider) {
-        const values = window.siecleSlider.get();
-        siecleMin = Number(values[0]);
-        siecleMax = Number(values[1]);
+    let anneeMin = null, anneeMax = null;
+    if (window.anneeSlider) {
+        const values = window.anneeSlider.get();
+        anneeMin = Number(values[0]);
+        anneeMax = Number(values[1]);
     }
     const ardt = document.getElementById('filter-ardt')?.value;
     const objet = document.getElementById('filter-objet')?.value;
     const periode = document.getElementById('filter-periode')?.value;
+    const type = document.getElementById('filter-type')?.value || "all";
+    const top100 = getTop100Popularite(plaquesData);
 
     // Filtrer les données
     const filtered = {
         ...plaquesData,
         features: plaquesData.features.filter(f => {
             const p = f.properties;
-            // Pour le curseur double siècle, on garde dans l'intervalle
-            const siecleOk = (!siecleMin || !siecleMax || (p.siecle && !isNaN(Number(p.siecle)) && Number(p.siecle) >= siecleMin && Number(p.siecle) <= siecleMax));
-            return siecleOk
-                && (!ardt || String(p.ardt) === ardt)
+
+            // Filtre type de personnes
+            if (type === "personnes" && (!p.personnalite || p.personnalite === "")) return false;
+            if (type === "celebres" && (!(p.personnalite && p.score_popularite > 1))) return false;
+            if (type === "celebrissimes" && (!(p.personnalite && top100.includes(p.score_popularite)))) return false;
+
+            // Filtre années
+            let debut = parseInt(p.annee_debut);
+            let fin = parseInt(p.annee_fin);
+            let hasAnnee = !isNaN(debut) || !isNaN(fin);
+            let matchAnnee = false;
+            if (!isNaN(debut) && !isNaN(fin)) {
+                // période connue
+                matchAnnee = (fin >= anneeMin && debut <= anneeMax);
+            } else if (!isNaN(debut)) {
+                matchAnnee = (debut >= anneeMin && debut <= anneeMax);
+            } else if (!isNaN(fin)) {
+                matchAnnee = (fin >= anneeMin && fin <= anneeMax);
+            }
+            // Si aucune année connue, on regarde le siècle
+            if (!hasAnnee) {
+                // On inclut si le siècle correspond à la période filtrée
+                let siecle = p.siecle;
+                if (siecle && typeof siecle === "string") {
+                    // Ex: "19-20", "20", "18-19"
+                    let siecles = siecle.split('-').map(s => parseInt(s));
+                    for (let s of siecles) {
+                        if (!isNaN(s)) {
+                            // bornes du siècle
+                            let sMin = (s - 1) * 100 + 1;
+                            let sMax = s * 100;
+                            if (sMax >= anneeMin && sMin <= anneeMax) {
+                                matchAnnee = true;
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+            // On inclut aussi les entrées sans année ni siècle (cas rare)
+            if (!hasAnnee && !p.siecle) matchAnnee = true;
+
+            if (!matchAnnee) return false;
+
+            // Filtres classiques
+            return (!ardt || String(p.ardt) === ardt)
                 && (!objet || p.objet_1 === objet)
                 && (!periode || p.periode_1 === periode);
         })

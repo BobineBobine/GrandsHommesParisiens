@@ -53,10 +53,15 @@ def get_wikipedia_views_from_title(nom):
     wikipedia_title = nom.replace(' ', '_')
     api_url = f"https://wikimedia.org/api/rest_v1/metrics/pageviews/per-article/fr.wikipedia/all-access/all-agents/{wikipedia_title}/monthly/20230101/20231231"
     headers = {"User-Agent": "GrandsHommesParisiensBot/1.0 (contact: gaumontalexis@gmail.com)"}
-    response = requests.get(api_url, headers=headers)
-    if response.status_code == 200:
-        data = response.json()
-        return sum(item['views'] for item in data['items'])
+    try:
+        response = requests.get(api_url, headers=headers, timeout=10)
+        if response.status_code == 200:
+            data = response.json()
+            return sum(item['views'] for item in data['items'])
+        else:
+            print(f"Erreur Wikipedia API pour {wikipedia_title} : code {response.status_code}")
+    except requests.RequestException as e:
+        print(f"Erreur de connexion Wikipedia API pour {wikipedia_title} : {e}")
     return 0
 
 # Compléter les données GeoJSON
