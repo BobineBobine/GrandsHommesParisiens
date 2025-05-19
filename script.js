@@ -33,8 +33,10 @@ function getMinMaxAnnee(data) {
         if (!isNaN(fin)) max = Math.max(max, fin);
     });
     // fallback si aucune année trouvée
-    if (!isFinite(min)) min = 1700;
+    if (!isFinite(min)) min = 0;
     if (!isFinite(max)) max = new Date().getFullYear();
+    // Forcer min à 0
+    min = 0;
     return [min, max];
 }
 
@@ -52,28 +54,35 @@ function createFilters(data) {
     const filtersDiv = document.getElementById('filters');
     filtersDiv.innerHTML = '';
 
-    // Filtre par type de personnes
+    // Filtre par type de personnes (renommé)
     const typeDiv = document.createElement('div');
     typeDiv.style = 'display:flex;flex-direction:column;';
     typeDiv.innerHTML = `
-        <label style="margin-bottom:0.2em;">Type</label>
+        <label style="margin-bottom:0.2em;">Sélection</label>
         <select id="filter-type">
-            <option value="all">Tout le monde</option>
-            <option value="personnes">Personnes (champ "personnalite" non vide)</option>
-            <option value="celebres">Personnes célèbres (score_popularite > 1)</option>
-            <option value="celebrissimes">Célébrissimes (top 100 popularité)</option>
+            <option value="all">Toutes les personnes</option>
+            <option value="personnes">Uniquement les personnes (sans bâtiments ni évènements)</option>
+            <option value="wikipedia">Uniquement celles qui ont une page Wikipédia</option>
+            <option value="top100">Uniquement le top 100 (nombre de visites Wikipédia)</option>
         </select>
     `;
     filtersDiv.appendChild(typeDiv);
 
-    // Curseur d'années (double-bouton)
+    // Curseur d'années (double-bouton) + saisie manuelle
     const [minAnnee, maxAnnee] = getMinMaxAnnee(data);
     const anneeLabel = document.createElement('label');
-    anneeLabel.innerHTML = `Années&nbsp;<span id="annee-range-value">${minAnnee} - ${maxAnnee}</span>`;
+    anneeLabel.style = 'display:flex;align-items:center;gap:0.7em;margin-bottom:0.5em;';
+    anneeLabel.innerHTML = `
+        <span>Période :</span>
+        <input type="number" id="input-annee-min" min="0" max="${maxAnnee}" value="${minAnnee}" style="width:5em;">
+        <span>à</span>
+        <input type="number" id="input-annee-max" min="0" max="${maxAnnee}" value="${maxAnnee}" style="width:5em;">
+    `;
+    filtersDiv.appendChild(anneeLabel);
+
     const anneeSliderDiv = document.createElement('div');
     anneeSliderDiv.id = 'annee-slider';
-    anneeLabel.appendChild(anneeSliderDiv);
-    filtersDiv.appendChild(anneeLabel);
+    filtersDiv.appendChild(anneeSliderDiv);
 
     window.anneeSlider = noUiSlider.create(anneeSliderDiv, {
         start: [minAnnee, maxAnnee],
@@ -86,9 +95,24 @@ function createFilters(data) {
             from: v => Math.round(v)
         }
     });
+
+    // Synchronisation curseur <-> input
     anneeSliderDiv.noUiSlider.on('update', function (values) {
-        document.getElementById('annee-range-value').textContent = `${values[0]} - ${values[1]}`;
+        document.getElementById('input-annee-min').value = values[0];
+        document.getElementById('input-annee-max').value = values[1];
         updatePlaquesLayer();
+    });
+    document.getElementById('input-annee-min').addEventListener('change', function () {
+        let min = parseInt(this.value) || 0;
+        let max = parseInt(document.getElementById('input-annee-max').value) || maxAnnee;
+        if (min > max) min = max;
+        window.anneeSlider.set([min, null]);
+    });
+    document.getElementById('input-annee-max').addEventListener('change', function () {
+        let min = parseInt(document.getElementById('input-annee-min').value) || 0;
+        let max = parseInt(this.value) || maxAnnee;
+        if (max < min) max = min;
+        window.anneeSlider.set([null, max]);
     });
 
     // Filtre par arrondissement
@@ -152,10 +176,10 @@ function updatePlaquesLayer() {
         features: plaquesData.features.filter(f => {
             const p = f.properties;
 
-            // Filtre type de personnes
+            // Filtre type de personnes (renommé)
             if (type === "personnes" && (!p.personnalite || p.personnalite === "")) return false;
-            if (type === "celebres" && (!(p.personnalite && p.score_popularite > 1))) return false;
-            if (type === "celebrissimes" && (!(p.personnalite && top100.includes(p.score_popularite)))) return false;
+            if (type === "wikipedia" && (!(p.personnalite && p.score_popularite && p.score_popularite > 1))) return false;
+            if (type === "top100" && (!(p.personnalite && top100.includes(p.score_popularite)))) return false;
 
             // Filtre années
             let debut = parseInt(p.annee_debut);
@@ -163,23 +187,18 @@ function updatePlaquesLayer() {
             let hasAnnee = !isNaN(debut) || !isNaN(fin);
             let matchAnnee = false;
             if (!isNaN(debut) && !isNaN(fin)) {
-                // période connue
                 matchAnnee = (fin >= anneeMin && debut <= anneeMax);
             } else if (!isNaN(debut)) {
                 matchAnnee = (debut >= anneeMin && debut <= anneeMax);
             } else if (!isNaN(fin)) {
                 matchAnnee = (fin >= anneeMin && fin <= anneeMax);
             }
-            // Si aucune année connue, on regarde le siècle
             if (!hasAnnee) {
-                // On inclut si le siècle correspond à la période filtrée
                 let siecle = p.siecle;
                 if (siecle && typeof siecle === "string") {
-                    // Ex: "19-20", "20", "18-19"
                     let siecles = siecle.split('-').map(s => parseInt(s));
                     for (let s of siecles) {
                         if (!isNaN(s)) {
-                            // bornes du siècle
                             let sMin = (s - 1) * 100 + 1;
                             let sMax = s * 100;
                             if (sMax >= anneeMin && sMin <= anneeMax) {
@@ -190,12 +209,9 @@ function updatePlaquesLayer() {
                     }
                 }
             }
-            // On inclut aussi les entrées sans année ni siècle (cas rare)
             if (!hasAnnee && !p.siecle) matchAnnee = true;
-
             if (!matchAnnee) return false;
 
-            // Filtres classiques
             return (!ardt || String(p.ardt) === ardt)
                 && (!objet || p.objet_1 === objet)
                 && (!periode || p.periode_1 === periode);
@@ -207,18 +223,24 @@ function updatePlaquesLayer() {
         map.removeLayer(plaquesLayer);
     }
 
+    // Définir un joli pin SVG bleu
+    const blueIcon = L.icon({
+        iconUrl: 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="32" height="48" viewBox="0 0 32 48"><path d="M16 0C7.163 0 0 7.163 0 16c0 12.944 14.222 30.222 15.021 31.221a2 2 0 0 0 3.958 0C17.778 46.222 32 28.944 32 16c0-8.837-7.163-16-16-16z" fill="%23377dff"/><circle cx="16" cy="16" r="7" fill="white"/></svg>',
+        iconSize: [32, 48],
+        iconAnchor: [16, 47],
+        popupAnchor: [0, -40]
+    });
+
     // Ajouter la nouvelle couche filtrée avec popup stylée
     plaquesLayer = L.geoJSON(filtered, {
         pointToLayer: function (feature, latlng) {
             const p = feature.properties;
-            // Nettoyer les '/' dans la retranscription
             let retranscription = (p.retranscription || '').replace(/ ?\/ ?/g, '<br>');
             let popupHtml = `
                 <div class="popup-title">${p.titre || '(Sans titre)'}</div>
                 <div class="popup-adresse">${p.adresse || ''}</div>
                 <div class="popup-retranscription">${retranscription}</div>
             `;
-            // Ajout de tags
             let tags = [];
             if (p.siecle) tags.push(`<span title="Siècle">🕰️ ${p.siecle}e</span>`);
             if (p.ardt) tags.push(`<span title="Arrondissement">📍 ${p.ardt}e</span>`);
@@ -227,7 +249,7 @@ function updatePlaquesLayer() {
             if (tags.length) {
                 popupHtml += `<div class="popup-tags">${tags.join(' &nbsp;|&nbsp; ')}</div>`;
             }
-            return L.marker(latlng).bindPopup(popupHtml);
+            return L.marker(latlng, {icon: blueIcon}).bindPopup(popupHtml);
         }
     }).addTo(map);
 }

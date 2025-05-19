@@ -78,6 +78,18 @@ body {
     margin-top: 0.7em;
     margin-bottom: 0.2em;
 }
+#filters label[for="input-annee-min"], #filters label[for="input-annee-max"] {
+    font-weight: 400;
+    margin: 0 0.3em;
+}
+#input-annee-min, #input-annee-max {
+    border: 1px solid #bbb;
+    border-radius: 5px;
+    padding: 0.2em 0.5em;
+    font-size: 1em;
+    width: 5em;
+    margin: 0 0.2em;
+}
 .noUi-target {
     background: #f3f3f3;
     border-radius: 6px;
